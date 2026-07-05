@@ -7,4 +7,5 @@ edition = "2024"
 anyhow = "1.0.103"
 iced = "0.14.0"
 lighty-launcher = { version = "26.5.12", features = ["events", "all-loaders"] }
+redb = "4.1.0"
 secrecy = "0.10.3"

@@ -2,8 +2,7 @@ mod account;
 mod ui;
 
 use iced::{Element, Task, widget::container};
-use lighty_launcher::{UserProfile, core::AppState};
-use secrecy::ExposeSecret;
+use lighty_launcher::core::AppState;
 
 use crate::{
     account::{MyUserProfile, create_offline_account, create_online_account},
@@ -23,8 +22,6 @@ struct ClientState {
     accounts: Vec<MyUserProfile>,
     current_user: Option<MyUserProfile>,
 }
-
-
 
 impl ClientState {
     fn new() -> Self {
@@ -50,25 +47,17 @@ impl ClientState {
                 }
                 AccountEvent::CreateOfflineAccount => {
                     let username = self.name_input.clone();
+                    self.name_input.clear();
                     Task::perform(create_offline_account(username), Message::Logged)
                 }
                 AccountEvent::LoginAccount(user) => {
-
-                    let access_token = if let Some(u) = user.access_token {
-                        Some(u.expose_secret().to_string())
-                    } else {None};
-                    
-                    self.current_user = Some(MyUserProfile {
-                        id: user.id,
-                        username: user.username,
-                        uuid: user.uuid,
-                        access_token: access_token,
-                        x
-                    });
+                    self.current_user = Some(user);
+                    self.current_page = Pages::InstancePage;
                     Task::none()
                 }
             },
             Message::Logged(result) => {
+                println!("logged");
                 if let Ok(new_user) = result {
                     if !self
                         .accounts
@@ -77,8 +66,12 @@ impl ClientState {
                     {
                         self.current_user = Some(new_user.clone());
                         self.accounts.push(new_user);
+                        self.current_login_mode = LoginMode::SelectMode;
+                    } else {
+                        self.current_user = Some(new_user);
+                        self.current_login_mode = LoginMode::SelectMode;
+                        self.current_page = Pages::InstancePage;
                     }
-                    // user exist
                 }
                 Task::none()
             }
@@ -94,7 +87,11 @@ impl ClientState {
     }
 
     fn view(&self) -> Element<'_, Message> {
-        container(self.account_page()).into()
+        container(match self.current_page {
+            Pages::AccountPage => self.account_page(),
+            Pages::InstancePage => self.instance_page(),
+        })
+        .into()
     }
 }
 
@@ -105,7 +102,7 @@ enum Message {
     Account(AccountEvent),
     AuthMode(LoginMode),
     NameChanged(String),
-    Logged(Result<UserProfile, String>),
+    Logged(Result<MyUserProfile, String>),
 }
 
 #[derive(Debug, Clone)]

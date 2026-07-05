@@ -3,15 +3,14 @@ use iced::{
     Length::{self, Fill},
     widget::{button, column, container, pick_list, row, text, text_input},
 };
-use lighty_launcher::UserProfile;
 
-use crate::{ClientState, Message};
+use crate::{ClientState, Message, account::MyUserProfile};
 
 #[derive(Debug, Clone)]
 pub enum AccountEvent {
     CreateOnlineAccount,
     CreateOfflineAccount,
-    LoginAccount(UserProfile)
+    LoginAccount(MyUserProfile),
 }
 
 #[derive(Debug, Clone)]
@@ -29,11 +28,14 @@ impl ClientState {
                     button("Online Account").on_press(Message::AuthMode(LoginMode::Online)),
                     button("Offline Account").on_press(Message::AuthMode(LoginMode::Offline))
                 ]
-                .height(Fill)
                 .spacing(10)
                 .align_y(Alignment::Center),
-                pick_list(self.accounts, self.current_user, Message::Account(AccountEvent::LoginAccount))
+                pick_list(self.accounts.clone(), self.current_user.clone(), |user| {
+                    Message::Account(AccountEvent::LoginAccount(user))
+                }).width(200).menu_height(Fill)
             ]
+            .spacing(10)
+            .height(Fill)
             .align_x(Alignment::Center),
             LoginMode::Online => column![self.login_online_account()].align_x(Alignment::Center),
             LoginMode::Offline => column![self.create_offline_account()].align_x(Alignment::Center),
