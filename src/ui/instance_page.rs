@@ -17,7 +17,7 @@ impl ClientState {
         container(column![
             row![
                 Space::new().width(Fill),
-                button(username).on_press(Message::None)
+                button(username).on_press(Message::Page(crate::Pages::AccountPage))
             ],
             self.instance_list()
         ])

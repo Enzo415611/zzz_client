@@ -22,6 +22,18 @@ pub enum LoginMode {
 
 impl ClientState {
     pub fn account_page(&self) -> Element<'_, Message> {
+        let list = if self.accounts.len() >= 1 {
+            Some(
+                pick_list(self.accounts.clone(), self.current_user.clone(), |user| {
+                    Message::Account(AccountEvent::LoginAccount(user))
+                })
+                .width(200)
+                .menu_height(Fill),
+            )
+        } else {
+            None
+        };
+
         let column = match self.current_login_mode {
             LoginMode::SelectMode => column![
                 row![
@@ -30,9 +42,7 @@ impl ClientState {
                 ]
                 .spacing(10)
                 .align_y(Alignment::Center),
-                pick_list(self.accounts.clone(), self.current_user.clone(), |user| {
-                    Message::Account(AccountEvent::LoginAccount(user))
-                }).width(200).menu_height(Fill)
+                list
             ]
             .spacing(10)
             .height(Fill)

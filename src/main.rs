@@ -1,11 +1,13 @@
 mod account;
+mod instances;
 mod ui;
 
 use iced::{Element, Task, widget::container};
-use lighty_launcher::core::AppState;
+use lighty_launcher::{JavaDistribution, Loader, VersionBuilder, core::AppState};
 
 use crate::{
     account::{MyUserProfile, create_offline_account, create_online_account},
+    instances::{Instance, run_instance},
     ui::account_pages::{AccountEvent, LoginMode},
 };
 
@@ -21,6 +23,8 @@ struct ClientState {
     current_login_mode: LoginMode,
     accounts: Vec<MyUserProfile>,
     current_user: Option<MyUserProfile>,
+    instances: Vec<VersionBuilder<Loader>>,
+    java_distribution: JavaDistribution,
 }
 
 impl ClientState {
@@ -31,6 +35,8 @@ impl ClientState {
             current_login_mode: LoginMode::SelectMode,
             accounts: vec![],
             current_user: None,
+            instances: vec![],
+            java_distribution: JavaDistribution::Temurin,
         }
     }
 
@@ -83,6 +89,26 @@ impl ClientState {
                 self.name_input = name;
                 Task::none()
             }
+            Message::CreateInstance(ins) => {
+                let new_instance = VersionBuilder::new(
+                    &ins.instance_name,
+                    ins.loader,
+                    &ins.loader_version,
+                    &ins.minecraft_version,
+                );
+                self.instances.push(new_instance);
+                Task::none()
+            }
+            Message::RunInstance(ins) => {
+                if let Some(user) = &self.current_user {
+                    return Task::perform(
+                        run_instance(user.clone(), ins, self.java_distribution.clone()),
+                        |_| Message::InstanceRunning(()),
+                    );
+                }
+                Task::none()
+            }
+            Message::InstanceRunning(()) => Task::none(),
         }
     }
 
@@ -103,6 +129,9 @@ enum Message {
     AuthMode(LoginMode),
     NameChanged(String),
     Logged(Result<MyUserProfile, String>),
+    CreateInstance(Instance),
+    RunInstance(VersionBuilder<Loader>),
+    InstanceRunning(()),
 }
 
 #[derive(Debug, Clone)]
