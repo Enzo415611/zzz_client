@@ -1,6 +1,6 @@
 use lighty_launcher::{
     Authenticator, UserProfile,
-    auth::{self, AuthProvider},
+    auth::{self, AuthProvider, UserRole},
 };
 use secrecy::{ExposeSecret, SecretBox};
 
@@ -14,7 +14,7 @@ pub enum MyAuthProvider {
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
-pub struct UserRole {
+pub struct MyUserRole {
     pub name: String,
     pub color: Option<String>,
 }
@@ -29,9 +29,27 @@ pub struct MyUserProfile {
     pub email: Option<String>,
     pub email_verified: bool,
     pub money: Option<f64>,
-    pub role: Option<UserRole>,
+    pub role: Option<MyUserRole>,
     pub banned: bool,
     pub provider: MyAuthProvider,
+}
+
+impl Default for MyUserProfile {
+    fn default() -> Self {
+        Self {
+            id: None,
+            username: "".into(),
+            uuid: "".into(),
+            access_token: None,
+            xuid: None,
+            email: None,
+            email_verified: false,
+            money: None,
+            role: None,
+            banned: false,
+            provider: MyAuthProvider::Offline,
+        }
+    }
 }
 
 impl ToString for MyUserProfile {
@@ -55,16 +73,14 @@ pub fn to_my_user_profile(user: UserProfile) -> MyUserProfile {
         auth::AuthProvider::Offline => MyAuthProvider::Offline,
         _ => MyAuthProvider::Offline,
     };
+    let mut role: MyUserRole = MyUserRole::default();
 
-    let default_role = auth::UserRole {
-        color: None,
-        name: String::new()
-    };
-    
-    let role = UserRole {
-      color: user.role.clone().unwrap_or(default_role.clone()).color,
-      name: user.role.unwrap_or(default_role).name      
-    };
+    if let Some(r) = user.role {
+        role = MyUserRole {
+            name: r.name,
+            color: r.color,
+        };
+    }
 
     MyUserProfile {
         id: user.id,
@@ -86,43 +102,42 @@ pub fn to_my_user_profile(user: UserProfile) -> MyUserProfile {
     }
 }
 
-pub fn to_user_profile(user: &MyUserProfile) -> UserProfile {
-    let role = auth::UserRole {
-        name: user.role.clone().unwrap_or_default().name,
-        color: user.role.clone().unwrap_or_default().color,
-    };
-
+pub fn to_user_profile(user: MyUserProfile) -> UserProfile {
     let provider = match &user.provider {
         crate::account::MyAuthProvider::Microsoft {
             client_id,
             refresh_token,
         } => AuthProvider::Microsoft {
-            client_id: client_id.clone(),
-            refresh_token: Some(SecretBox::new(
-                String::from(refresh_token).into_boxed_str(),
-            )),
+            client_id: client_id.to_string(),
+            refresh_token: Some(SecretBox::new(String::from(refresh_token).into_boxed_str())),
         },
         crate::account::MyAuthProvider::Offline => AuthProvider::Offline,
     };
+    let mut role = None;
+    if let Some(r) = user.role {
+        role = Some(UserRole {
+            name: r.name,
+            color: r.color,
+        });
+    }
 
     UserProfile {
         id: user.id,
-        username: user.username.clone(),
-        uuid: user.uuid.clone(),
+        username: user.username,
+        uuid: user.uuid,
         access_token: Some(SecretBox::new(
             user.access_token
-                .clone()
                 .unwrap_or_else(|| String::new())
                 .into_boxed_str(),
         )),
-        xuid: user.xuid.clone(),
-        email: user.email.clone(),
+        xuid: user.xuid,
+        email: user.email,
         email_verified: user.email_verified,
         money: user.money,
-        role: Some(role),
+        role: role,
         provider,
         banned: user.banned,
-    } 
+    }
 }
 
 pub async fn create_online_account() -> Result<MyUserProfile, String> {
@@ -141,9 +156,7 @@ pub async fn create_online_account() -> Result<MyUserProfile, String> {
 pub async fn create_offline_account(username: String) -> Result<MyUserProfile, String> {
     let mut auth = auth::OfflineAuth::new(username);
     match auth.authenticate(None).await {
-        Ok(user) => {
-            Ok(to_my_user_profile(user))
-        }
+        Ok(user) => Ok(to_my_user_profile(user)),
         Err(err) => Err(format!("{}", err)),
     }
 }
