@@ -1,4 +1,5 @@
 mod account;
+mod api;
 mod instances;
 mod ui;
 
@@ -7,6 +8,7 @@ use lighty_launcher::{JavaDistribution, Loader, VersionBuilder, core::AppState};
 
 use crate::{
     account::{MyUserProfile, create_offline_account, create_online_account},
+    api::{VersionManifest, get_minecraft_versions},
     instances::run_instance,
     ui::{
         account_pages::{AccountEvent, LoginMode},
@@ -29,25 +31,29 @@ struct ClientState {
     instances: Vec<VersionBuilder<Loader>>,
     new_instance: Instance,
     java_distribution: JavaDistribution,
+    minecraft_versions: Vec<String>,
 }
 
 impl ClientState {
-    fn new() -> Self {
-        Self {
-            current_page: Pages::AccountPage,
-            name_input: String::new(),
-            current_login_mode: LoginMode::SelectMode,
-            accounts: vec![],
-            current_user: None,
-            instances: vec![],
-            new_instance: Instance::default(),
-            java_distribution: JavaDistribution::Temurin,
-        }
+    fn new() -> (Self, Task<Message>) {
+        (
+            Self {
+                current_page: Pages::AccountPage,
+                name_input: String::new(),
+                current_login_mode: LoginMode::SelectMode,
+                accounts: vec![],
+                current_user: None,
+                instances: vec![],
+                new_instance: Instance::default(),
+                java_distribution: JavaDistribution::Temurin,
+                minecraft_versions: vec![],
+            },
+            Task::done(Message::GetMinecraftVersions),
+        )
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
-            Message::None => Task::none(),
             Message::Page(page) => {
                 self.current_page = page;
                 Task::none()
@@ -100,7 +106,7 @@ impl ClientState {
                         self.new_instance.loader_version = version;
                     }
                     ConfigInstance::MinecraftVersion(version) => {
-                        self.new_instance.minecraft_version = version;
+                        self.new_instance.minecraft_version = Some(version);
                     }
                     ConfigInstance::CreateInstance => {
                         let ins = self.new_instance.clone();
@@ -109,7 +115,7 @@ impl ClientState {
                             &ins.instance_name,
                             to_loader(ins.loader.unwrap_or(MyLoader::Vanilla)),
                             &ins.loader_version,
-                            &ins.minecraft_version,
+                            &ins.minecraft_version.unwrap(),
                         );
 
                         self.instances.push(new_instance);
@@ -133,6 +139,26 @@ impl ClientState {
                 Task::none()
             }
             Message::InstanceRunning(()) => Task::none(),
+            Message::GetMinecraftVersions => {
+                Task::perform(get_minecraft_versions(), Message::LoadedMinecraftVersions)
+            }
+            Message::LoadedMinecraftVersions(result) => {
+                match result {
+                    Ok(r) => {
+                        self.minecraft_versions = r
+                            .versions
+                            .into_iter()
+                            .filter(|v| v.version_type == "release")
+                            .map(|v| v.id)
+                            .collect();
+                        println!("{:?}", self.minecraft_versions);
+                    }
+                    Err(err) => {
+                        println!("{}", err)
+                    }
+                }
+                Task::none()
+            }
         }
     }
 
@@ -155,7 +181,6 @@ enum ConfigInstance {
 
 #[derive(Debug, Clone)]
 enum Message {
-    None,
     Page(Pages),
     Account(AccountEvent),
     AuthMode(LoginMode),
@@ -164,6 +189,8 @@ enum Message {
     ConfigNewInstance(ConfigInstance),
     RunInstance(VersionBuilder<Loader>),
     InstanceRunning(()),
+    GetMinecraftVersions,
+    LoadedMinecraftVersions(Result<VersionManifest, String>),
 }
 
 #[derive(Debug, Clone)]

@@ -1,9 +1,7 @@
 use iced::{
     Alignment, Element,
     Length::Fill,
-    widget::{
-        self, Space, button, column, container, pick_list, row, scrollable, text, text_input,
-    },
+    widget::{Space, button, column, container, pick_list, row, scrollable, text, text_input},
 };
 use lighty_launcher::Loader;
 
@@ -17,9 +15,6 @@ const LOADERS: [MyLoader; 6] = [
     MyLoader::NeoForge,
     MyLoader::Quilt,
 ];
-
-// usar uma api no lugar de valores já definidos
-const MINECRAFT_VERSIONS: [&str; 3] = ["26.1", "1.21.11", "1.21.1"];
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum MyLoader {
@@ -61,7 +56,7 @@ pub struct Instance {
     pub instance_name: String,
     pub loader: Option<MyLoader>,
     pub loader_version: String,
-    pub minecraft_version: String,
+    pub minecraft_version: Option<String>,
 }
 
 impl Default for Instance {
@@ -70,7 +65,7 @@ impl Default for Instance {
             instance_name: "ZzzClient".to_string(),
             loader: Some(MyLoader::Vanilla),
             loader_version: "".to_string(),
-            minecraft_version: "1.21.1".to_string(),
+            minecraft_version: None,
         }
     }
 }
@@ -97,13 +92,7 @@ impl ClientState {
         let instance_name_input = text_input("Instance Name", &self.new_instance.instance_name)
             .on_input(|name| Message::ConfigNewInstance(crate::ConfigInstance::InstanceName(name)));
 
-        let minecraft_version = scrollable(column![].extend(MINECRAFT_VERSIONS.iter().map(|v| {
-            button(v.clone())
-                .on_press(Message::ConfigNewInstance(
-                    crate::ConfigInstance::MinecraftVersion(String::from(v.to_string())),
-                ))
-                .into()
-        })));
+        let minecraft_version = self.minecraft_versions_list();
 
         let loader_version_text_input =
             text_input("Loader Version", &self.new_instance.loader_version)
@@ -126,6 +115,16 @@ impl ClientState {
         let list = pick_list(LOADERS, self.new_instance.loader.clone(), |l| {
             Message::ConfigNewInstance(crate::ConfigInstance::Loader(l.clone()))
         });
+
+        list.into()
+    }
+
+    fn minecraft_versions_list(&self) -> Element<'_, Message> {
+        let list = pick_list(
+            self.minecraft_versions.as_ref(),
+            self.new_instance.minecraft_version.as_ref(),
+            move |v| Message::ConfigNewInstance(crate::ConfigInstance::MinecraftVersion(v)),
+        );
 
         list.into()
     }
